@@ -1,6 +1,7 @@
 package com.celltick.log.model;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,14 +35,12 @@ public class DistributionCalculation {
 
     public void count(List<String[]> rawValueList) {
 
+        List<Callable<String>> callables = new ArrayList<>(rawValueList.size());
 
-        List<Callable<String>> callables =   new ArrayList<>(rawValueList.size());
-
-        rawValueList.forEach(rawValue->{
-            Callable<String> test = () ->  metricExtractor.extract(rawValue);
+        rawValueList.forEach(rawValue -> {
+            Callable<String> test = () -> metricExtractor.extract(rawValue);
             callables.add(test);
         });
-
 
         try {
             executor.invokeAll(callables).forEach(futureMetricValue -> {
@@ -67,23 +66,23 @@ public class DistributionCalculation {
 
     }
 
-    private Map<String, String> calculate() {
-        Map<String, String> distribution = new HashMap<>(counter.size());
+    private List<DistributionResult> calculate() {
+        List<DistributionResult> listResult = new ArrayList<>(counter.size());
         counter.forEach((key, value) -> {
-            distribution.put(key,
-                             String.format("%.2f", PercentageCalculator.calculatePercentage(value, total)));
+            listResult.add(DistributionResult.builder().key(key).distribution(
+                    PercentageCalculator.calculatePercentage(value, total)).build());
         });
 
-        return distribution;
+        return listResult;
     }
 
     public void printResult() {
-        Map<String, String> result = calculate();
+        List<DistributionResult> result = calculate();
 
-        result.forEach((key, value) -> {
-            log.info("{} : {}%", key, value);
-        });
-
+        result.stream().sorted(Comparator.comparing(DistributionResult::getDistribution).reversed()).forEach(
+                (item) -> {
+                    log.info("{} : {}%", item.getKey(), String.format("%.2f",item.getDistribution()));
+                });
     }
 
 }
